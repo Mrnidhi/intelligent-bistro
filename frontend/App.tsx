@@ -1,12 +1,25 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
   ScrollView,
   StatusBar,
-  ActivityIndicator,
   StyleSheet,
+  Pressable,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  withRepeat,
+  withSequence,
+  FadeIn,
+  FadeInDown,
+  FadeInRight,
+  Easing,
+} from "react-native-reanimated";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import { MenuItem } from "./types/menu";
 import { CartItem } from "./types/cart";
@@ -19,7 +32,15 @@ import { CartModal } from "./components/CartModal";
 import { CheckoutModal } from "./components/CheckoutModal";
 import { AIChatSheet } from "./components/AIChatSheet";
 import { AskAIButton } from "./components/AskAIButton";
-import { CATEGORY_LABELS, COLORS } from "./constants/theme";
+import {
+  CATEGORY_LABELS,
+  COLORS,
+  TYPE,
+  SPACING,
+  RADIUS,
+  shadow,
+  shadowMedium,
+} from "./constants/theme";
 
 type Category =
   | "all" | "sandwich" | "burger" | "salad"
@@ -29,11 +50,55 @@ const CATEGORIES: Category[] = [
   "all", "sandwich", "burger", "salad", "soup", "sides", "drinks", "dessert",
 ];
 
+/* ─── AI Suggestion chips ─── */
+const AI_SUGGESTIONS = [
+  { emoji: "🔥", label: "Popular tonight", query: "What's popular tonight?" },
+  { emoji: "🌶️", label: "Spicy lovers", query: "Recommend something spicy" },
+  { emoji: "🥗", label: "Light & fresh", query: "Something light and fresh" },
+  { emoji: "🍫", label: "Sweet tooth", query: "I want dessert" },
+];
+
 export default function App() {
   return (
     <SafeAreaProvider>
       <BistroScreen />
     </SafeAreaProvider>
+  );
+}
+
+/* ─── Shimmer loading placeholder ─── */
+function ShimmerCard({ index }: { index: number }) {
+  const shimmer = useSharedValue(0.3);
+
+  useEffect(() => {
+    shimmer.value = withDelay(
+      index * 120,
+      withRepeat(
+        withSequence(
+          withTiming(0.7, { duration: 800, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0.3, { duration: 800, easing: Easing.inOut(Easing.ease) })
+        ),
+        -1,
+        true
+      )
+    );
+  }, []);
+
+  const shimmerStyle = useAnimatedStyle(() => ({
+    opacity: shimmer.value,
+  }));
+
+  return (
+    <Animated.View style={[styles.shimmerCard, shimmerStyle]}>
+      <View style={styles.shimmerRow}>
+        <View style={styles.shimmerIcon} />
+        <View style={styles.shimmerLines}>
+          <View style={[styles.shimmerLine, { width: "70%" }]} />
+          <View style={[styles.shimmerLine, { width: "90%", marginTop: 8 }]} />
+          <View style={[styles.shimmerLine, { width: "50%", marginTop: 8 }]} />
+        </View>
+      </View>
+    </Animated.View>
   );
 }
 
@@ -80,6 +145,23 @@ function BistroScreen() {
       ? menu
       : menu.filter((item) => item.category === activeCategory);
 
+  /* ─── AI Status dot pulse ─── */
+  const dotPulse = useSharedValue(1);
+  useEffect(() => {
+    dotPulse.value = withRepeat(
+      withSequence(
+        withTiming(1.6, { duration: 1000, easing: Easing.inOut(Easing.ease) }),
+        withTiming(1, { duration: 1000, easing: Easing.inOut(Easing.ease) })
+      ),
+      -1,
+      true
+    );
+  }, []);
+
+  const dotStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: dotPulse.value }],
+  }));
+
   return (
     <SafeAreaView style={styles.safe} edges={["top", "left", "right"]}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.cream} />
@@ -88,62 +170,122 @@ function BistroScreen() {
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 100 }}
+        contentContainerStyle={{ paddingBottom: 120 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.statusRow}>
+        {/* ─── AI Status Pill ─── */}
+        <Animated.View
+          entering={FadeInDown.delay(300).duration(500).springify()}
+          style={styles.statusRow}
+        >
           <View style={styles.statusPill}>
-            <View style={styles.statusDot} />
+            <Animated.View style={[styles.statusDot, dotStyle]} />
             <Text style={styles.statusText}>AI Online</Text>
           </View>
-        </View>
+        </Animated.View>
 
+        {/* ─── AI Suggestions Row ─── */}
+        <Animated.View entering={FadeInDown.delay(400).duration(500).springify()}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.suggestionsRow}
+            contentContainerStyle={{
+              paddingLeft: SPACING.xl,
+              paddingRight: SPACING.xl,
+            }}
+          >
+            {AI_SUGGESTIONS.map((sug, i) => (
+              <Pressable
+                key={sug.label}
+                onPress={() => setAiOpen(true)}
+                style={styles.aiSuggestionChip}
+              >
+                <Text style={styles.aiSuggestionEmoji}>{sug.emoji}</Text>
+                <Text style={styles.aiSuggestionText}>{sug.label}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </Animated.View>
+
+        {/* ─── Category Pills ─── */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           style={styles.pillRow}
-          contentContainerStyle={{ paddingLeft: 16, paddingRight: 16 }}
+          contentContainerStyle={{
+            paddingLeft: SPACING.xl,
+            paddingRight: SPACING.xl,
+          }}
         >
-          {CATEGORIES.map((cat) => (
+          {CATEGORIES.map((cat, i) => (
             <CategoryPill
               key={cat}
               label={CATEGORY_LABELS[cat]}
+              categoryKey={cat}
               active={activeCategory === cat}
               onPress={() => setActiveCategory(cat)}
+              index={i}
             />
           ))}
         </ScrollView>
 
+        {/* ─── Menu Section ─── */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>MENU</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionLabel}>MENU</Text>
+            <Text style={styles.itemCount}>
+              {filteredMenu.length} {filteredMenu.length === 1 ? "item" : "items"}
+            </Text>
+          </View>
 
+          {/* Loading shimmer */}
           {menuLoading && (
-            <View style={styles.centerBlock}>
-              <ActivityIndicator color={COLORS.accent} />
-              <Text style={styles.loadingText}>Loading menu...</Text>
+            <View>
+              {[0, 1, 2, 3].map((i) => (
+                <ShimmerCard key={i} index={i} />
+              ))}
             </View>
           )}
 
+          {/* Error state */}
           {menuError && (
-            <View style={styles.errorBlock}>
-              <Text style={styles.errorTitle}>Couldn't load the menu.</Text>
+            <Animated.View
+              entering={FadeInDown.duration(500).springify()}
+              style={styles.errorBlock}
+            >
+              <View style={styles.errorIconWrap}>
+                <Text style={styles.errorEmoji}>⚠️</Text>
+              </View>
+              <Text style={styles.errorTitle}>Couldn't load the menu</Text>
               <Text style={styles.errorSubtitle}>
-                Make sure the backend is running on port 4000.
+                Make sure the backend is running on port 4000
               </Text>
-            </View>
+            </Animated.View>
           )}
 
+          {/* Empty state */}
           {!menuLoading && !menuError && filteredMenu.length === 0 && (
-            <View style={styles.centerBlock}>
-              <Text style={styles.loadingText}>No items in this category.</Text>
-            </View>
+            <Animated.View
+              entering={FadeInDown.duration(400).springify()}
+              style={styles.emptyBlock}
+            >
+              <Text style={styles.emptyEmoji}>🍽️</Text>
+              <Text style={styles.emptyText}>No items in this category</Text>
+            </Animated.View>
           )}
 
+          {/* Menu cards */}
           {!menuLoading &&
             !menuError &&
-            filteredMenu.map((item) => (
-              <MenuCard key={item.id} item={item} onAdd={handleAddItem} />
+            filteredMenu.map((item, index) => (
+              <MenuCard
+                key={item.id}
+                item={item}
+                onAdd={handleAddItem}
+                index={index}
+              />
             ))}
         </View>
       </ScrollView>
@@ -165,50 +307,164 @@ function BistroScreen() {
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.cream },
-  scroll: { flex: 1 },
+  safe: {
+    flex: 1,
+    backgroundColor: COLORS.cream,
+  },
+  scroll: {
+    flex: 1,
+  },
+
+  /* AI Status */
   statusRow: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: SPACING.xl,
+    paddingBottom: SPACING.md,
   },
   statusPill: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADIUS.full,
     backgroundColor: COLORS.successBg,
     borderWidth: 1,
     borderColor: COLORS.successBorder,
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 999,
+    width: 7,
+    height: 7,
+    borderRadius: RADIUS.full,
     backgroundColor: COLORS.successDot,
-    marginRight: 6,
+    marginRight: 7,
   },
-  statusText: { fontSize: 12, fontWeight: "500", color: COLORS.successText },
-  pillRow: { marginBottom: 12 },
-  section: { paddingHorizontal: 16, marginBottom: 8 },
-  sectionLabel: {
-    fontSize: 12,
+  statusText: {
+    ...TYPE.labelSm,
+    color: COLORS.successText,
     fontWeight: "600",
-    color: COLORS.muted,
-    letterSpacing: 1,
-    marginBottom: 12,
   },
-  centerBlock: { paddingVertical: 40, alignItems: "center" },
-  loadingText: { fontSize: 14, color: COLORS.muted, marginTop: 8 },
+
+  /* AI Suggestion chips */
+  suggestionsRow: {
+    marginBottom: SPACING.lg,
+  },
+  aiSuggestionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: COLORS.accentGlow,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm + 2,
+    borderRadius: RADIUS.full,
+    marginRight: SPACING.sm,
+    borderWidth: 1,
+    borderColor: COLORS.accentLight,
+    gap: 6,
+  },
+  aiSuggestionEmoji: {
+    fontSize: 14,
+  },
+  aiSuggestionText: {
+    ...TYPE.labelSm,
+    color: COLORS.accentDark,
+    fontWeight: "600",
+  },
+
+  /* Category pills row */
+  pillRow: {
+    marginBottom: SPACING.xl,
+  },
+
+  /* Menu section */
+  section: {
+    paddingHorizontal: SPACING.xl,
+    marginBottom: SPACING.sm,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: SPACING.lg,
+  },
+  sectionLabel: {
+    ...TYPE.labelMd,
+    color: COLORS.muted,
+  },
+  itemCount: {
+    ...TYPE.labelSm,
+    color: COLORS.mutedSoft,
+  },
+
+  /* Shimmer loading */
+  shimmerCard: {
+    backgroundColor: COLORS.warm,
+    borderRadius: RADIUS.xxl,
+    padding: SPACING.xl,
+    marginBottom: SPACING.lg,
+  },
+  shimmerRow: {
+    flexDirection: "row",
+  },
+  shimmerIcon: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.warmSoft,
+    marginRight: SPACING.md,
+  },
+  shimmerLines: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  shimmerLine: {
+    height: 12,
+    borderRadius: RADIUS.sm,
+    backgroundColor: COLORS.warmSoft,
+  },
+
+  /* States */
+  emptyBlock: {
+    paddingVertical: SPACING.xxxl + 8,
+    alignItems: "center",
+  },
+  emptyEmoji: {
+    fontSize: 44,
+    marginBottom: SPACING.md,
+  },
+  emptyText: {
+    ...TYPE.bodyMd,
+    color: COLORS.muted,
+  },
   errorBlock: {
-    paddingVertical: 32,
+    paddingVertical: SPACING.xxxl,
+    paddingHorizontal: SPACING.xl,
     alignItems: "center",
     backgroundColor: COLORS.errorBg,
-    borderRadius: 16,
+    borderRadius: RADIUS.xxl,
     borderWidth: 1,
     borderColor: COLORS.errorBorder,
   },
-  errorTitle: { fontSize: 14, color: COLORS.errorText },
-  errorSubtitle: { fontSize: 12, color: COLORS.errorText, marginTop: 4 },
+  errorIconWrap: {
+    width: 56,
+    height: 56,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.white,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.errorBorder,
+  },
+  errorEmoji: {
+    fontSize: 28,
+  },
+  errorTitle: {
+    ...TYPE.headlineMd,
+    color: COLORS.errorText,
+    marginBottom: SPACING.xs,
+  },
+  errorSubtitle: {
+    ...TYPE.bodySm,
+    color: COLORS.errorText,
+    textAlign: "center",
+  },
 });

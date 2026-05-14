@@ -7,16 +7,26 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  FadeInDown,
+} from "react-native-reanimated";
 import { useCartStore } from "../store/cartStore";
 import { CartItemRow } from "./CartItemRow";
 import { PriceRow } from "./PriceRow";
-import { COLORS } from "../constants/theme";
+import { COLORS, TYPE, SPACING, RADIUS, shadow, shadowMedium } from "../constants/theme";
+import { SPRING_BOUNCE, SPRING_SNAPPY } from "../constants/animations";
 
 interface Props {
   visible: boolean;
   onClose: () => void;
   onCheckout: () => void;
 }
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function CartModal({ visible, onClose, onCheckout }: Props) {
   const cartItems = useCartStore((s) => s.cartItems);
@@ -25,6 +35,11 @@ export function CartModal({ visible, onClose, onCheckout }: Props) {
   const updateQuantity = useCartStore((s) => s.updateQuantity);
 
   const totalItems = cartItems.reduce((s, i) => s + i.quantity, 0);
+  const checkoutScale = useSharedValue(1);
+
+  const checkoutStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: checkoutScale.value }],
+  }));
 
   return (
     <Modal
@@ -34,29 +49,42 @@ export function CartModal({ visible, onClose, onCheckout }: Props) {
       onRequestClose={onClose}
     >
       <View style={styles.container}>
+        {/* ─── Header ─── */}
         <View style={styles.headerBar}>
           <View>
             <Text style={styles.headerTitle}>Your Cart</Text>
             {cartItems.length > 0 && (
-              <Text style={styles.headerSubtitle}>{totalItems} items</Text>
+              <Text style={styles.headerSubtitle}>
+                {totalItems} {totalItems === 1 ? "item" : "items"}
+              </Text>
             )}
           </View>
-          <Pressable onPress={onClose} hitSlop={12}>
+          <Pressable
+            onPress={onClose}
+            hitSlop={12}
+            style={styles.closeButton}
+          >
             <Text style={styles.closeText}>✕</Text>
           </Pressable>
         </View>
 
         {cartItems.length === 0 ? (
           <View style={styles.empty}>
-            <Text style={styles.emptyEmoji}>🍽️</Text>
+            <View style={styles.emptyIconWrap}>
+              <Text style={styles.emptyEmoji}>🍽️</Text>
+            </View>
             <Text style={styles.emptyTitle}>Your cart is empty</Text>
             <Text style={styles.emptySubtitle}>
-              Browse the menu or ask the AI to add something
+              Browse the menu or ask the AI assistant to add items for you
             </Text>
           </View>
         ) : (
           <>
-            <ScrollView style={styles.scroll} contentContainerStyle={{ paddingHorizontal: 16 }}>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={{ paddingHorizontal: SPACING.xl }}
+              showsVerticalScrollIndicator={false}
+            >
               {cartItems.map((item) => (
                 <CartItemRow
                   key={`${item.itemId}-${JSON.stringify(item.modifiers)}`}
@@ -67,17 +95,29 @@ export function CartModal({ visible, onClose, onCheckout }: Props) {
               ))}
             </ScrollView>
 
+            {/* ─── Footer summary ─── */}
             <View style={styles.footer}>
-              <PriceRow label="Subtotal" value={cartSummary.subtotal} />
-              <PriceRow label="Tax (9%)" value={cartSummary.tax} />
-              <View style={styles.divider} />
-              <PriceRow label="Total" value={cartSummary.total} bold />
+              <View style={styles.summaryBlock}>
+                <PriceRow label="Subtotal" value={cartSummary.subtotal} />
+                <PriceRow label="Tax (9%)" value={cartSummary.tax} />
+                <View style={styles.divider} />
+                <PriceRow label="Total" value={cartSummary.total} bold />
+              </View>
 
-              <Pressable onPress={onCheckout} style={styles.checkoutButton}>
+              <AnimatedPressable
+                onPress={() => {
+                  checkoutScale.value = withSequence(
+                    withSpring(0.95, SPRING_SNAPPY),
+                    withSpring(1, SPRING_BOUNCE)
+                  );
+                  onCheckout();
+                }}
+                style={[styles.checkoutButton, checkoutStyle]}
+              >
                 <Text style={styles.checkoutText}>
-                  Checkout • ${cartSummary.total.toFixed(2)}
+                  Checkout · ${cartSummary.total.toFixed(2)}
                 </Text>
-              </Pressable>
+              </AnimatedPressable>
             </View>
           </>
         )}
@@ -88,51 +128,100 @@ export function CartModal({ visible, onClose, onCheckout }: Props) {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.cream },
+
+  /* Header */
   headerBar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg + 2,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: COLORS.borderLight,
     backgroundColor: COLORS.white,
   },
-  headerTitle: { fontSize: 17, fontWeight: "700", color: COLORS.dark },
-  headerSubtitle: { fontSize: 13, color: COLORS.muted, marginTop: 2 },
-  closeText: { fontSize: 22, color: COLORS.muted, paddingHorizontal: 4 },
+  headerTitle: {
+    ...TYPE.headlineLg,
+    color: COLORS.dark,
+  },
+  headerSubtitle: {
+    ...TYPE.labelSm,
+    color: COLORS.muted,
+    marginTop: 3,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.warm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeText: {
+    fontSize: 18,
+    color: COLORS.muted,
+  },
+
+  /* Empty state */
   empty: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: SPACING.xxxl,
   },
-  emptyEmoji: { fontSize: 56, marginBottom: 12 },
-  emptyTitle: { fontSize: 17, fontWeight: "600", color: COLORS.dark },
+  emptyIconWrap: {
+    width: 80,
+    height: 80,
+    borderRadius: RADIUS.xxl,
+    backgroundColor: COLORS.warm,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: SPACING.xl,
+    borderWidth: 1,
+    borderColor: COLORS.borderLight,
+  },
+  emptyEmoji: { fontSize: 36 },
+  emptyTitle: {
+    ...TYPE.headlineMd,
+    color: COLORS.dark,
+    marginBottom: SPACING.sm,
+  },
   emptySubtitle: {
-    fontSize: 14,
+    ...TYPE.bodyMd,
     color: COLORS.muted,
-    marginTop: 6,
     textAlign: "center",
+    lineHeight: 22,
   },
+
+  /* Content */
   scroll: { flex: 1 },
+
+  /* Footer */
   footer: {
-    padding: 16,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.xl,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: COLORS.borderLight,
     backgroundColor: COLORS.white,
+  },
+  summaryBlock: {
+    marginBottom: SPACING.lg,
   },
   divider: {
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    marginVertical: 8,
+    borderTopColor: COLORS.borderLight,
+    marginVertical: SPACING.sm,
   },
   checkoutButton: {
-    marginTop: 14,
-    backgroundColor: COLORS.accent,
-    paddingVertical: 16,
-    borderRadius: 14,
+    backgroundColor: COLORS.dark,
+    paddingVertical: SPACING.lg + 2,
+    borderRadius: RADIUS.lg,
     alignItems: "center",
+    ...shadowMedium,
   },
-  checkoutText: { color: COLORS.white, fontSize: 16, fontWeight: "700" },
+  checkoutText: {
+    color: COLORS.white,
+    ...TYPE.headlineMd,
+  },
 });

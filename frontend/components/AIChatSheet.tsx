@@ -11,11 +11,24 @@ import {
   Platform,
   StyleSheet,
 } from "react-native";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  withDelay,
+  withRepeat,
+  withSequence,
+  FadeInDown,
+  FadeInUp,
+  Easing,
+} from "react-native-reanimated";
 import { useCartStore } from "../store/cartStore";
 import { sendChatMessage } from "../services/api";
 import { ChatMessage } from "../types/chat";
 import { SuggestedPrompt } from "./SuggestedPrompt";
-import { COLORS } from "../constants/theme";
+import { COLORS, TYPE, SPACING, RADIUS, shadow, shadowMedium } from "../constants/theme";
+import { SPRING_BOUNCE, SPRING_SNAPPY } from "../constants/animations";
 
 interface Props {
   visible: boolean;
@@ -33,20 +46,83 @@ const SUGGESTIONS = [
 const INITIAL_MESSAGE: ChatMessage = {
   id: "welcome",
   role: "assistant",
-  text: "Hi! I'm your Bistro assistant. Tell me what you'd like to order, or ask for a recommendation.",
+  text: "Hi! I'm your Bistro assistant. Tell me what you'd like to order, or ask for a recommendation. ✨",
   timestamp: Date.now(),
 };
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+/* ─── Typing indicator with animated dots ─── */
+function TypingIndicator() {
+  const dot1 = useSharedValue(0);
+  const dot2 = useSharedValue(0);
+  const dot3 = useSharedValue(0);
+
+  useEffect(() => {
+    const anim = (sv: Animated.SharedValue<number>, delay: number) => {
+      sv.value = withDelay(
+        delay,
+        withRepeat(
+          withSequence(
+            withTiming(-4, { duration: 300, easing: Easing.inOut(Easing.ease) }),
+            withTiming(0, { duration: 300, easing: Easing.inOut(Easing.ease) })
+          ),
+          -1,
+          true
+        )
+      );
+    };
+    anim(dot1, 0);
+    anim(dot2, 150);
+    anim(dot3, 300);
+  }, []);
+
+  const d1 = useAnimatedStyle(() => ({ transform: [{ translateY: dot1.value }] }));
+  const d2 = useAnimatedStyle(() => ({ transform: [{ translateY: dot2.value }] }));
+  const d3 = useAnimatedStyle(() => ({ transform: [{ translateY: dot3.value }] }));
+
+  return (
+    <View style={styles.typingRow}>
+      <View style={[styles.bubble, styles.bubbleAssistant, styles.typingBubble]}>
+        <View style={styles.dots}>
+          <Animated.View style={[styles.dot, d1]} />
+          <Animated.View style={[styles.dot, d2]} />
+          <Animated.View style={[styles.dot, d3]} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+/* ─── Message Bubble ─── */
+function MessageBubble({ message, index }: { message: ChatMessage; index: number }) {
   const isUser = message.role === "user";
   return (
-    <View style={[styles.bubbleRow, { alignItems: isUser ? "flex-end" : "flex-start" }]}>
-      <View style={[styles.bubble, isUser ? styles.bubbleUser : styles.bubbleAssistant]}>
-        <Text style={[styles.bubbleText, { color: isUser ? COLORS.white : COLORS.dark }]}>
+    <Animated.View
+      entering={FadeInDown.delay(50).duration(400).springify().damping(20)}
+      style={[styles.bubbleRow, { alignItems: isUser ? "flex-end" : "flex-start" }]}
+    >
+      {!isUser && (
+        <View style={styles.avatarSmall}>
+          <Text style={styles.avatarText}>✨</Text>
+        </View>
+      )}
+      <View
+        style={[
+          styles.bubble,
+          isUser ? styles.bubbleUser : styles.bubbleAssistant,
+        ]}
+      >
+        <Text
+          style={[
+            styles.bubbleText,
+            { color: isUser ? COLORS.white : COLORS.dark },
+          ]}
+        >
           {message.text}
         </Text>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 
@@ -60,6 +136,8 @@ export function AIChatSheet({ visible, onClose }: Props) {
   const cartItems = useCartStore((s) => s.cartItems);
   const replaceCart = useCartStore((s) => s.replaceCart);
 
+  const sendScale = useSharedValue(1);
+
   // Reset to clean state every time the sheet is reopened
   useEffect(() => {
     if (visible) {
@@ -71,6 +149,11 @@ export function AIChatSheet({ visible, onClose }: Props) {
   async function handleSend(text?: string) {
     const message = (text ?? input).trim();
     if (!message || loading) return;
+
+    sendScale.value = withSequence(
+      withSpring(0.85, SPRING_SNAPPY),
+      withSpring(1, SPRING_BOUNCE)
+    );
 
     const userMsg: ChatMessage = {
       id: String(Date.now()),
@@ -99,11 +182,18 @@ export function AIChatSheet({ visible, onClose }: Props) {
       );
     } finally {
       setLoading(false);
-      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+      setTimeout(
+        () => scrollRef.current?.scrollToEnd({ animated: true }),
+        100
+      );
     }
   }
 
   const sendDisabled = loading || !input.trim();
+
+  const sendBtnStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: sendScale.value }],
+  }));
 
   return (
     <Modal
@@ -122,77 +212,104 @@ export function AIChatSheet({ visible, onClose }: Props) {
         <View style={styles.sheet}>
           <View style={styles.handle} />
 
+          {/* ─── Header ─── */}
           <View style={styles.header}>
             <View style={styles.headerLeft}>
               <View style={styles.aiBadge}>
                 <Text style={styles.aiBadgeText}>✨</Text>
               </View>
               <View>
-                <Text style={styles.headerTitle}>Ask AI</Text>
-                <Text style={styles.headerSubtitle}>Bistro assistant</Text>
+                <Text style={styles.headerTitle}>AI Assistant</Text>
+                <View style={styles.statusRow}>
+                  <View style={styles.statusDot} />
+                  <Text style={styles.headerSubtitle}>Online & ready</Text>
+                </View>
               </View>
             </View>
-            <Pressable onPress={onClose} hitSlop={10}>
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={styles.closeButton}
+            >
               <Text style={styles.closeText}>✕</Text>
             </Pressable>
           </View>
 
+          {/* ─── Messages ─── */}
           <ScrollView
             ref={scrollRef}
             style={styles.messageList}
             showsVerticalScrollIndicator={false}
-            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+            onContentSizeChange={() =>
+              scrollRef.current?.scrollToEnd({ animated: true })
+            }
           >
-            {messages.map((msg) => (
-              <MessageBubble key={msg.id} message={msg} />
+            {messages.map((msg, i) => (
+              <MessageBubble key={msg.id} message={msg} index={i} />
             ))}
-            {loading && (
-              <View style={[styles.bubbleRow, { alignItems: "flex-start" }]}>
-                <View style={[styles.bubble, styles.bubbleAssistant]}>
-                  <ActivityIndicator size="small" color={COLORS.accent} />
-                </View>
-              </View>
-            )}
+            {loading && <TypingIndicator />}
             {error && (
-              <View style={[styles.bubbleRow, { alignItems: "flex-start" }]}>
+              <Animated.View
+                entering={FadeInDown.duration(300)}
+                style={[
+                  styles.bubbleRow,
+                  { alignItems: "flex-start" },
+                ]}
+              >
                 <View style={[styles.bubble, styles.bubbleError]}>
                   <Text style={styles.errorText}>{error}</Text>
                 </View>
-              </View>
+              </Animated.View>
             )}
           </ScrollView>
 
+          {/* ─── Suggestions ─── */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.suggestions}
-            contentContainerStyle={{ paddingHorizontal: 16, paddingRight: 24 }}
+            contentContainerStyle={{
+              paddingHorizontal: SPACING.xl,
+              paddingRight: SPACING.xxl,
+            }}
           >
             {SUGGESTIONS.map((s) => (
               <SuggestedPrompt key={s} text={s} onPress={handleSend} />
             ))}
           </ScrollView>
 
+          {/* ─── Input ─── */}
           <View style={styles.inputRow}>
-            <TextInput
-              value={input}
-              onChangeText={setInput}
-              placeholder="Ask me anything about the menu..."
-              placeholderTextColor={COLORS.muted}
-              style={styles.textInput}
-              onSubmitEditing={() => handleSend()}
-              returnKeyType="send"
-              editable={!loading}
-            />
-            <Pressable
+            <View style={styles.inputContainer}>
+              <TextInput
+                value={input}
+                onChangeText={setInput}
+                placeholder="Tell me what you're craving…"
+                placeholderTextColor={COLORS.mutedSoft}
+                style={styles.textInput}
+                onSubmitEditing={() => handleSend()}
+                returnKeyType="send"
+                editable={!loading}
+              />
+            </View>
+            <AnimatedPressable
               onPress={() => handleSend()}
               disabled={sendDisabled}
-              style={[styles.sendButton, sendDisabled && styles.sendDisabled]}
+              style={[
+                styles.sendButton,
+                sendDisabled && styles.sendDisabled,
+                sendBtnStyle,
+              ]}
             >
-              <Text style={[styles.sendText, sendDisabled && styles.sendTextDisabled]}>
-                Send
+              <Text
+                style={[
+                  styles.sendText,
+                  sendDisabled && styles.sendTextDisabled,
+                ]}
+              >
+                ↑
               </Text>
-            </Pressable>
+            </AnimatedPressable>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -203,104 +320,205 @@ export function AIChatSheet({ visible, onClose }: Props) {
 const styles = StyleSheet.create({
   backdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(44, 24, 16, 0.35)",
+    backgroundColor: COLORS.overlay,
   },
   kbWrap: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     backgroundColor: COLORS.cream,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 24,
-    maxHeight: "85%",
+    borderTopLeftRadius: RADIUS.xxxl,
+    borderTopRightRadius: RADIUS.xxxl,
+    paddingBottom: 32,
+    maxHeight: "88%",
   },
   handle: {
     alignSelf: "center",
-    width: 40,
-    height: 4,
-    borderRadius: 999,
+    width: 44,
+    height: 5,
+    borderRadius: RADIUS.full,
     backgroundColor: COLORS.border,
-    marginTop: 10,
-    marginBottom: 6,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
   },
+
+  /* Header */
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SPACING.xl,
+    paddingVertical: SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
+    borderBottomColor: COLORS.borderLight,
   },
   headerLeft: { flexDirection: "row", alignItems: "center" },
   aiBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 999,
-    backgroundColor: COLORS.accent,
+    width: 42,
+    height: 42,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.accentGlow,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 10,
+    marginRight: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.accentLight,
   },
-  aiBadgeText: { fontSize: 18 },
-  headerTitle: { fontSize: 16, fontWeight: "700", color: COLORS.dark },
-  headerSubtitle: { fontSize: 12, color: COLORS.muted, marginTop: 1 },
-  closeText: { fontSize: 22, color: COLORS.muted, paddingHorizontal: 4 },
+  aiBadgeText: { fontSize: 20 },
+  headerTitle: {
+    ...TYPE.headlineMd,
+    color: COLORS.dark,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 2,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.successDot,
+    marginRight: 5,
+  },
+  headerSubtitle: {
+    ...TYPE.labelSm,
+    color: COLORS.successText,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.warm,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  closeText: {
+    fontSize: 18,
+    color: COLORS.muted,
+  },
+
+  /* Messages */
   messageList: {
-    maxHeight: 320,
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    maxHeight: 340,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.lg,
   },
-  bubbleRow: { marginBottom: 8 },
+  bubbleRow: {
+    marginBottom: SPACING.md,
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  avatarSmall: {
+    width: 28,
+    height: 28,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.accentGlow,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  avatarText: { fontSize: 13 },
   bubble: {
     maxWidth: 280,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 16,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderRadius: RADIUS.xl,
   },
   bubbleUser: {
-    backgroundColor: COLORS.accent,
-    borderTopRightRadius: 4,
+    backgroundColor: COLORS.dark,
+    borderBottomRightRadius: RADIUS.sm,
   },
   bubbleAssistant: {
-    backgroundColor: COLORS.warm,
+    backgroundColor: COLORS.white,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderTopLeftRadius: 4,
+    borderColor: COLORS.borderLight,
+    borderBottomLeftRadius: RADIUS.sm,
+    ...shadow,
   },
   bubbleError: {
     backgroundColor: COLORS.errorBg,
     borderWidth: 1,
     borderColor: COLORS.errorBorder,
-    borderTopLeftRadius: 4,
+    borderBottomLeftRadius: RADIUS.sm,
   },
-  bubbleText: { fontSize: 14, lineHeight: 20 },
-  errorText: { fontSize: 14, color: COLORS.errorText, lineHeight: 20 },
-  suggestions: { paddingVertical: 10 },
+  bubbleText: {
+    ...TYPE.bodyMd,
+    lineHeight: 22,
+  },
+  errorText: {
+    ...TYPE.bodyMd,
+    color: COLORS.errorText,
+    lineHeight: 22,
+  },
+
+  /* Typing indicator */
+  typingRow: {
+    marginBottom: SPACING.md,
+    flexDirection: "row",
+    gap: SPACING.sm,
+    alignItems: "flex-start",
+  },
+  typingBubble: {
+    paddingVertical: SPACING.md + 2,
+    paddingHorizontal: SPACING.lg,
+  },
+  dots: {
+    flexDirection: "row",
+    gap: 5,
+    alignItems: "center",
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.mutedSoft,
+  },
+
+  /* Suggestions */
+  suggestions: {
+    paddingVertical: SPACING.md,
+  },
+
+  /* Input */
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 4,
-    gap: 8,
+    paddingHorizontal: SPACING.xl,
+    paddingTop: SPACING.sm,
+    gap: SPACING.sm,
   },
-  textInput: {
+  inputContainer: {
     flex: 1,
     backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderLight,
+    borderRadius: RADIUS.lg,
+    ...shadow,
+  },
+  textInput: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md + 2,
+    ...TYPE.bodyMd,
     color: COLORS.dark,
   },
   sendButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-    backgroundColor: COLORS.accent,
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.lg,
+    backgroundColor: COLORS.dark,
+    alignItems: "center",
+    justifyContent: "center",
+    ...shadowMedium,
   },
-  sendDisabled: { backgroundColor: COLORS.border },
-  sendText: { color: COLORS.white, fontSize: 14, fontWeight: "600" },
-  sendTextDisabled: { color: COLORS.muted },
+  sendDisabled: {
+    backgroundColor: COLORS.border,
+  },
+  sendText: {
+    color: COLORS.white,
+    fontSize: 20,
+    fontWeight: "700",
+    marginTop: -2,
+  },
+  sendTextDisabled: {
+    color: COLORS.muted,
+  },
 });

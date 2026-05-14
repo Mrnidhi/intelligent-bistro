@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { COLORS } from "../constants/theme";
+import { COLORS, TYPE, SPACING } from "../constants/theme";
 
 interface Props {
   label: string;
@@ -11,8 +11,10 @@ interface Props {
 export function PriceRow({ label, value, bold = false }: Props) {
   return (
     <View style={styles.row}>
-      <Text style={[styles.text, bold && styles.bold]}>{label}</Text>
-      <Text style={[styles.text, bold && styles.bold]}>${value.toFixed(2)}</Text>
+      <Text style={[styles.text, bold && styles.boldText]}>{label}</Text>
+      <Text style={[styles.value, bold && styles.boldValue]}>
+        ${value.toFixed(2)}
+      </Text>
     </View>
   );
 }
@@ -21,13 +23,23 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    paddingVertical: 2,
+    paddingVertical: SPACING.xs + 1,
   },
   text: {
-    fontSize: 14,
+    ...TYPE.bodyMd,
+    color: COLORS.muted,
+  },
+  value: {
+    ...TYPE.bodyMd,
+    color: COLORS.dark,
+    fontWeight: "500",
+  },
+  boldText: {
+    ...TYPE.headlineMd,
     color: COLORS.dark,
   },
-  bold: {
-    fontWeight: "700",
+  boldValue: {
+    ...TYPE.headlineMd,
+    color: COLORS.dark,
   },
 });

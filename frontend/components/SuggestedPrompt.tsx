@@ -1,29 +1,58 @@
 import React from "react";
 import { Pressable, Text, StyleSheet } from "react-native";
-import { COLORS } from "../constants/theme";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+} from "react-native-reanimated";
+import { COLORS, TYPE, SPACING, RADIUS, shadow } from "../constants/theme";
+import { SPRING_BOUNCE, SPRING_SNAPPY } from "../constants/animations";
 
 interface Props {
   text: string;
   onPress: (text: string) => void;
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export function SuggestedPrompt({ text, onPress }: Props) {
+  const scale = useSharedValue(1);
+
+  const animStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <Pressable onPress={() => onPress(text)} style={styles.chip}>
+    <AnimatedPressable
+      onPress={() => {
+        scale.value = withSequence(
+          withSpring(0.92, SPRING_SNAPPY),
+          withSpring(1, SPRING_BOUNCE)
+        );
+        onPress(text);
+      }}
+      style={[styles.chip, animStyle]}
+    >
       <Text style={styles.text}>{text}</Text>
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
 const styles = StyleSheet.create({
   chip: {
-    marginRight: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 999,
-    backgroundColor: COLORS.warm,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    marginRight: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm + 2,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderColor: COLORS.borderLight,
+    ...shadow,
   },
-  text: { fontSize: 12, color: COLORS.brown },
+  text: {
+    ...TYPE.bodySm,
+    color: COLORS.brown,
+    fontWeight: "500",
+  },
 });

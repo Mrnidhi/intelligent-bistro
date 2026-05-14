@@ -170,3 +170,4 @@ I used Claude Code during development for initial boilerplate, component structu
 - **Fallback parser is intentionally limited** — it covers the demo script; a real implementation would use the AI exclusively
 
 This is a polished take-home prototype, not production-ready software.
+ 

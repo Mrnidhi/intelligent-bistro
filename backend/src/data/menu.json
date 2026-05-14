@@ -1,0 +1,91 @@
+[
+  {
+    "id": "spicy-chicken-sandwich",
+    "name": "Spicy Chicken Sandwich",
+    "category": "sandwich",
+    "price": 12.99,
+    "description": "Crispy fried chicken thigh with house-made sriracha aioli, pickled jalapeños, shredded cabbage, and brioche bun.",
+    "tags": ["spicy", "popular", "chicken"],
+    "availableModifiers": {
+      "spiceLevel": ["mild", "medium", "spicy"],
+      "notes": true
+    }
+  },
+  {
+    "id": "bistro-burger",
+    "name": "Bistro Burger",
+    "category": "burger",
+    "price": 14.99,
+    "description": "8oz grass-fed beef patty, aged cheddar, caramelized onions, arugula, and house bistro sauce on a toasted sesame bun.",
+    "tags": ["popular", "beef", "classic"],
+    "availableModifiers": {
+      "notes": true
+    }
+  },
+  {
+    "id": "truffle-fries",
+    "name": "Truffle Fries",
+    "category": "sides",
+    "price": 7.99,
+    "description": "Hand-cut fries tossed in truffle oil and parmesan, served with house aioli dipping sauce.",
+    "tags": ["vegetarian", "popular", "sides"],
+    "availableModifiers": {
+      "size": ["small", "medium", "large"],
+      "notes": true
+    }
+  },
+  {
+    "id": "caesar-salad",
+    "name": "Caesar Salad",
+    "category": "salad",
+    "price": 10.99,
+    "description": "Crisp romaine hearts, house-made Caesar dressing, shaved parmesan, sourdough croutons, and lemon zest.",
+    "tags": ["vegetarian", "salad", "light"],
+    "availableModifiers": {
+      "notes": true
+    }
+  },
+  {
+    "id": "tomato-basil-soup",
+    "name": "Tomato Basil Soup",
+    "category": "soup",
+    "price": 8.99,
+    "description": "Slow-roasted San Marzano tomatoes blended with fresh basil, a touch of cream, and house-baked bread.",
+    "tags": ["vegetarian", "warm", "soup"],
+    "availableModifiers": {
+      "size": ["small", "medium", "large"],
+      "notes": true
+    }
+  },
+  {
+    "id": "sparkling-water",
+    "name": "Sparkling Water",
+    "category": "drinks",
+    "price": 3.49,
+    "description": "Chilled sparkling mineral water served with lemon or lime.",
+    "tags": ["drink", "non-alcoholic"],
+    "availableModifiers": {
+      "notes": true
+    }
+  },
+  {
+    "id": "still-water",
+    "name": "Still Water",
+    "category": "drinks",
+    "price": 2.49,
+    "description": "Chilled still water.",
+    "tags": ["drink", "non-alcoholic"],
+    "availableModifiers": {}
+  },
+  {
+    "id": "chocolate-lava-cake",
+    "name": "Chocolate Lava Cake",
+    "category": "dessert",
+    "price": 9.99,
+    "description": "Warm dark chocolate cake with a molten center, served with a scoop of vanilla bean ice cream and raspberry coulis.",
+    "tags": ["dessert", "sweet", "popular"],
+    "availableModifiers": {
+      "notes": true
+    }
+  }
+]
